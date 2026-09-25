@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,10 +64,15 @@ fun AppRow(app: AppInfo, onClick: () -> Unit) {
 fun HomeScreen() {
     val context = LocalContext.current
     var apps by remember { mutableStateOf(emptyList<AppInfo>()) }
+    var grouped by remember { mutableStateOf(emptyMap<Char, List<AppInfo>>()) }
+    var selectedLetter by remember { mutableStateOf<Char?>(null) }
+    var isDragging by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(Unit) {
-        apps = withContext(Dispatchers.IO) { AppRepository.load(context).first }
+        val pair = withContext(Dispatchers.IO) { AppRepository.load(context) }
+        apps = pair.first
+        grouped = pair.second
     }
     LaunchedEffect(Unit) {
         while (true) {
@@ -81,6 +88,7 @@ fun HomeScreen() {
         SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date(now))
     }
     val favourites = remember(apps) { apps.take(6) }
+    val filtered = if (selectedLetter != null) grouped[selectedLetter] ?: emptyList() else emptyList()
 
     Box(
         modifier = Modifier
@@ -93,14 +101,43 @@ fun HomeScreen() {
                     .weight(1f)
                     .padding(start = 24.dp, top = 64.dp, end = 8.dp, bottom = 24.dp)
             ) {
-                Text(text = timeText, color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Light)
-                Text(text = dateText, color = Color(0xFFB0B0B0), fontSize = 15.sp)
-                Spacer(modifier = Modifier.height(28.dp))
-                favourites.forEach { app ->
-                    AppRow(app = app) { AppLauncher.launch(context, app) }
+                if (selectedLetter == null) {
+                    Text(text = timeText, color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Light)
+                    Text(text = dateText, color = Color(0xFFB0B0B0), fontSize = 15.sp)
+                    Spacer(modifier = Modifier.height(28.dp))
+                    favourites.forEach { app ->
+                        AppRow(app = app) { AppLauncher.launch(context, app) }
+                    }
+                } else {
+                    Text(
+                        text = selectedLetter?.toString() ?: "",
+                        color = Color.White,
+                        fontSize = 64.sp,
+                        fontWeight = FontWeight.Light
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (filtered.isEmpty()) {
+                        Text(text = "No apps", color = Color(0xFFB0B0B0), fontSize = 15.sp)
+                    } else {
+                        LazyColumn {
+                            items(filtered, key = { it.packageName }) { app ->
+                                AppRow(app = app) { AppLauncher.launch(context, app) }
+                            }
+                        }
+                    }
                 }
             }
-            AlphabetBar()
+            AlphabetBar(
+                selectedLetter = selectedLetter,
+                isDragging = isDragging,
+                onLetter = { letter ->
+                    selectedLetter = letter
+                    isDragging = true
+                },
+                onRelease = {
+                    isDragging = false
+                }
+            )
         }
     }
 }
