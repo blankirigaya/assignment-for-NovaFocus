@@ -4,6 +4,37 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+import com.android.build.gradle.AppExtension
+import java.io.File
+
+tasks.register("installLauncher") {
+    dependsOn("installDebug")
+    val androidExt = project.extensions.getByType<AppExtension>()
+    val suffix = if (System.getProperty("os.name").startsWith("Windows")) ".exe" else ""
+    val adb = androidExt.sdkDirectory.resolve("platform-tools/adb$suffix").absolutePath
+    val appId = androidExt.defaultConfig.applicationId
+    doLast {
+        require(File(adb).exists()) { "adb not found at $adb" }
+        fun runAdb(args: List<String>): String {
+            val process = ProcessBuilder(listOf(adb) + args).redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().readText().trim()
+            check(process.waitFor() == 0) { "adb ${args.joinToString(" ")} failed: $output" }
+            return output
+        }
+        val serial = System.getenv("ANDROID_SERIAL").orEmpty()
+        val target = if (serial.isNotEmpty()) listOf("-s", serial) else emptyList()
+        if (serial.isEmpty()) {
+            val ready = runAdb(listOf("devices")).lines().drop(1).mapNotNull { line: String ->
+                line.trim().split("\\s+".toRegex()).takeIf { parts: List<String> -> parts.size >= 2 }
+            }.filter { parts: List<String> -> parts[1] == "device" }
+            require(ready.size == 1) { "Expected exactly 1 ready device, found ${ready.size}. Set ANDROID_SERIAL to target one." }
+        }
+        val id = appId ?: throw GradleException("applicationId missing")
+        runAdb(target + listOf("shell", "cmd", "package", "set-home-activity", "$id/.MainActivity"))
+        println("Default HOME set to $id/.MainActivity")
+    }
+}
+
 android {
     namespace = "com.example.alphabetlauncher"
     compileSdk = 34
