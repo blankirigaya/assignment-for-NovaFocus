@@ -14,7 +14,7 @@ object AppRepository {
             val first = name.first().uppercaseChar()
             val letter = if (first in 'A'..'Z') first else '#'
             AppInfo(name, packageName, resolve.loadIcon(pm), letter)
-        }.sortedBy { it.name.lowercase() }
+        }.sortedBy { it.name.lowercase() }.distinctBy { it.packageName }
         return infos to infos.groupBy { it.letter }
     }
 }

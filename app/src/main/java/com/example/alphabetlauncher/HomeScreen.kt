@@ -63,6 +63,10 @@ fun AppRow(app: AppInfo, onClick: () -> Unit) {
 @Composable
 fun HomeScreen() {
     val context = LocalContext.current
+    val vibrator = remember {
+        @Suppress("DEPRECATION")
+        context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+    }
     var apps by remember { mutableStateOf(emptyList<AppInfo>()) }
     var grouped by remember { mutableStateOf(emptyMap<Char, List<AppInfo>>()) }
     var selectedLetter by remember { mutableStateOf<Char?>(null) }
@@ -131,7 +135,10 @@ fun HomeScreen() {
                 selectedLetter = selectedLetter,
                 isDragging = isDragging,
                 onLetter = { letter ->
-                    selectedLetter = letter
+                    if (letter != selectedLetter) {
+                        selectedLetter = letter
+                        vibrator.vibrate(android.os.VibrationEffect.createOneShot(60, 255))
+                    }
                     isDragging = true
                 },
                 onRelease = {
